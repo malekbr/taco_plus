@@ -319,6 +319,9 @@ module Ascii_login : Flow_state_machine = struct
   [@@deriving sexp_of, compare]
 
   let init (header : Header.t) (start : Start.t) (config : Config.t) =
+    let%bind.Option ascii_config =
+      Config.Authentication.Or_disabled.some_if_enabled config.authentication.ascii
+    in
     match start.action, start.type_ with
     | Login, Ascii
       when Header.Version_number.(equal minor_version_0) header.version
@@ -329,7 +332,7 @@ module Ascii_login : Flow_state_machine = struct
       (match start.user with
       | None ->
         Flow_response.make_state
-          (Request_user { remaining_retries = config.ascii_login_max_get_user_retries })
+          (Request_user { remaining_retries = ascii_config.max_get_user_retries })
           Reply.get_user
       | Some username ->
         Flow_response.make_state (Request_password { username }) Reply.get_password)
@@ -360,4 +363,31 @@ module Ascii_login : Flow_state_machine = struct
         then Reply.pass () |> Flow_response.final
         else Reply.fail () |> Flow_response.final)
   ;;
+end
+
+module Pap_login : Flow_state_machine = struct
+  open! State_action.Let_syntax
+
+  type t = Nothing.t [@@deriving sexp_of, compare]
+
+  let init (header : Header.t) (start : Start.t) (config : Config.t) =
+    let%bind.Option () =
+      Config.Authentication.Or_disabled.some_if_enabled config.authentication.pap
+    in
+    match start.action, start.type_ with
+    | Login, Pap
+      when Header.Version_number.(equal minor_version_1) header.version
+           && not (Service.equal start.service Enable) ->
+      Option.return
+      @@
+      (match start.user with
+      | None -> Reply.error () |> Flow_response.final |> return
+      | Some username ->
+        if%map Validate_password { username; password = start.data }
+        then Reply.pass () |> Flow_response.final
+        else Reply.fail () |> Flow_response.final)
+    | _ -> None
+  ;;
+
+  let continue t (_ : Continue.t) = Nothing.unreachable_code t
 end

@@ -1,5 +1,8 @@
 open! Core
 
+(* This module will need to track the state of
+ * a connection. *)
+
 module T = struct
   type 'a t =
     | Return : 'a -> 'a t
