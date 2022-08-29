@@ -1,0 +1,4 @@
+(executable
+ (public_name taco_plus)
+ (name main)
+ (libraries taco_plus))
