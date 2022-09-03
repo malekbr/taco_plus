@@ -1,5 +1,6 @@
 open! Core
 open! Async
+open! Helpers
 
 module Type = struct
   module T = struct
@@ -19,7 +20,7 @@ module Type = struct
   end
 
   include T
-  include Helpers.Make_enum (T)
+  include Make_enum (T)
 end
 
 module Flags = struct
@@ -44,7 +45,7 @@ module Flags = struct
   end
 
   include T
-  include Helpers.Make_flags (T)
+  include Make_flags (T)
 end
 
 module Version_number : sig
@@ -62,7 +63,7 @@ end = struct
   let parse iobuf =
     match Iobuf.Consume.uint8 iobuf with
     | (0xC0 | 0xC1) as t -> t
-    | version -> raise_s [%message "Unknown tacacs version" (version : Int.Hex.t)]
+    | version -> parse_error_s [%message "Unknown tacacs version" (version : Int.Hex.t)]
   ;;
 
   let minor_version_0 = 0xC0

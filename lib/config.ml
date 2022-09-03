@@ -25,4 +25,14 @@ module Authentication = struct
   [@@deriving sexp_of, compare]
 end
 
-type t = { authentication : Authentication.t } [@@deriving sexp_of, compare]
+type t =
+  { keys : string Core_unix.Cidr.Map.t
+  ; authentication : Authentication.t
+  }
+[@@deriving sexp_of, compare]
+
+let find_key t ip =
+  Sequence.find_map
+    (Sequence.range 32 0 ~stride:(-1) ~start:`inclusive ~stop:`inclusive)
+    ~f:(fun bits -> Map.find t.keys (Core_unix.Cidr.create ~base_address:ip ~bits))
+;;

@@ -299,6 +299,21 @@ module Flow_response = struct
     }
   [@@deriving sexp_of, compare]
 
+  let map t ~f =
+    { t with
+      state =
+        (match t.state with
+        | `State state -> `State (f state)
+        | `Finished -> `Finished)
+    }
+  ;;
+
+  module Let_syntax = struct
+    module Let_syntax = struct
+      let map = map
+    end
+  end
+
   let make_state state reply = { state = `State state; reply }
   let final reply = { state = `Finished; reply }
 end
@@ -391,3 +406,27 @@ module Pap_login : Flow_state_machine = struct
 
   let continue t (_ : Continue.t) = Nothing.unreachable_code t
 end
+
+module Packed = struct
+  type t =
+    | T :
+        ((module Flow_state_machine with type t = 'a) * 'a) Flow_response.t State_action.t
+        -> t
+
+  let pack x = T x
+end
+
+let init header start config =
+  match
+    List.find_map
+      [ (module Ascii_login : Flow_state_machine); (module Pap_login) ]
+      ~f:(fun (module Flow : Flow_state_machine) ->
+        let%map.Option response = Flow.init header start config in
+        Packed.pack
+        @@ let%map.State_action response = response in
+           let%map.Flow_response response = response in
+           (module Flow : Flow_state_machine with type t = Flow.t), response)
+  with
+  | Some response -> response
+  | None -> Reply.error () |> Flow_response.final |> State_action.return |> Packed.pack
+;;

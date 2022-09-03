@@ -1,5 +1,13 @@
 open! Core
 
+exception Parse_error of Sexp.t
+exception Runtime_error of Sexp.t
+
+let parse_error_s sexp = raise (Parse_error sexp)
+let parse_errorf format = Printf.ksprintf (fun s -> parse_error_s (Atom s)) format
+let runtime_error_s sexp = raise (Parse_error sexp)
+let runtime_errorf format = Printf.ksprintf (fun s -> parse_error_s (Atom s)) format
+
 module Make_enum (M : sig
   type t [@@deriving enumerate]
 
@@ -14,7 +22,7 @@ struct
     fun int ->
       match Option_array.get array int with
       | Some t -> t
-      | None | (exception _) -> failwithf "Unknown %s code %X" M.description int ()
+      | None | (exception _) -> parse_errorf "Unknown %s code %X" M.description int
   ;;
 
   let parse iobuf = Iobuf.Consume.int8 iobuf |> reverse_lookup

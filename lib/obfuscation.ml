@@ -18,3 +18,22 @@ let pseudo_pad_stream (header : Header.t) ~key =
       let next = Md5_lib.bytes bytes |> Md5_lib.to_binary in
       Some (md5, next))
 ;;
+
+let xor_char c1 c2 = Char.of_int_exn (Char.to_int c1 lxor Char.to_int c2)
+
+let process iobuf (header : Header.t) ~key =
+  let stream = pseudo_pad_stream header ~key in
+  Sequence.fold_until
+    stream
+    ~init:0
+    ~f:(fun pos pad ->
+      String.iteri pad ~f:(fun i c ->
+          let pos = pos + i in
+          if pos < header.length
+          then Iobuf.Poke.char iobuf (xor_char c (Iobuf.Peek.char iobuf ~pos)) ~pos);
+      let entire_pad_processed_pos = String.length pad + pos in
+      if entire_pad_processed_pos >= header.length
+      then Stop ()
+      else Continue entire_pad_processed_pos)
+    ~finish:ignore
+;;
